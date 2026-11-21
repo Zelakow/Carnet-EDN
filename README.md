@@ -1,6 +1,6 @@
 # Carnet-EDN
 
-## Générateur de QR code (`generateur-qr/`)
+## Générateur de QR code (`generateur-qrcode/`)
 
 Petite application web pour créer un QR code personnalisé qui renvoie vers un lien
 (portfolio sur Google Drive, site, LinkedIn…), à insérer dans un CV.
@@ -15,9 +15,9 @@ Tout se passe dans le navigateur : aucun lien ni image n'est envoyé sur un serv
 
 ### Utilisation
 
-Ouvrir `generateur-qr/index.html` dans un navigateur (double-clic suffit), ou l'activer
+Ouvrir `generateur-qrcode/index.html` dans un navigateur (double-clic suffit), ou l'activer
 en ligne avec GitHub Pages (Settings → Pages → branche `main`, dossier `/root`), puis
-aller sur `https://<utilisateur>.github.io/Carnet-EDN/generateur-qr/`.
+aller sur `https://<utilisateur>.github.io/Carnet-EDN/generateur-qrcode/`.
 
 Bibliothèque utilisée : [qr-code-styling](https://github.com/kozakdenys/qr-code-styling) (licence MIT),
-copiée dans `generateur-qr/vendor/` pour fonctionner hors ligne.
+copiée dans `generateur-qrcode/vendor/` pour fonctionner hors ligne.
