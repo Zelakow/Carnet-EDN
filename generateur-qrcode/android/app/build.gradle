@@ -1,0 +1,49 @@
+plugins { id 'com.android.application' }
+
+// The web app (../../index.html + vendor/) is copied into the APK assets at build time,
+// so the Android app always ships the same generator as the web version.
+def webAssets = layout.buildDirectory.dir("generated/webassets")
+tasks.register('copyWebApp', Copy) {
+    from(rootProject.file('..')) {
+        include 'index.html', 'vendor/**'
+    }
+    into webAssets
+}
+
+android {
+    namespace 'fr.carnet.qrcode'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'fr.carnet.qrcode'
+        minSdk 29
+        targetSdk 35
+        versionCode 1
+        versionName '1.0'
+    }
+    signingConfigs {
+        release {
+            // Provided through environment variables so the key never lives in git.
+            def ks = System.getenv('QR_KEYSTORE')
+            if (ks) {
+                storeFile file(ks)
+                storePassword System.getenv('QR_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('QR_KEY_ALIAS') ?: 'qrcode'
+                keyPassword System.getenv('QR_KEYSTORE_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig System.getenv('QR_KEYSTORE') ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+    lint { checkReleaseBuilds false; abortOnError false }
+    sourceSets { main { assets.srcDirs += webAssets } }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+tasks.named('preBuild') { dependsOn 'copyWebApp' }

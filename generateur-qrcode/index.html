@@ -287,6 +287,7 @@
       </div>
       <p class="hint">PNG : Word, Canva, Google Docs. SVG : net à toutes les tailles (Illustrator, Figma, Canva).<br>
       Sur un CV imprimé, prévoyez au moins 2 × 2 cm.</p>
+      <button class="secondary hidden" id="share" type="button" style="width:100%;margin-top:8px">Partager (mail, WhatsApp, Drive…)</button>
       <button class="secondary" id="reset" type="button" style="width:100%;margin-top:8px">Réinitialiser</button>
     </section>
   </aside>
@@ -516,6 +517,12 @@
   async function download(ext) {
     const name = (state.filename.trim() || "qr-code").replace(/[\\/:*?"<>|]+/g, "-");
     const exportQr = new QRCodeStyling(Object.assign(options(state.size), { type: ext === "svg" ? "svg" : "canvas" }));
+    if (window.AndroidQR) {
+      const res = await androidSend("save", name, ext, exportQr);
+      if (res.indexOf("ok:") === 0) flash("Enregistré dans " + res.slice(3) + " (" + name + "." + ext + ").", true);
+      else flash("Impossible d'enregistrer le fichier : " + res.replace("error:", ""), false);
+      return;
+    }
     const downloads = await downloadsReady;
     if (downloads) {
       try {
@@ -533,6 +540,32 @@
     if (inClaude) { flash("Le téléchargement n'est pas disponible dans cet affichage. Ouvrez la page directement dans claude.ai.", false); return; }
     exportQr.download({ name, extension: ext });
   }
+  // Android app: the native side stores or shares the file (base64 over the JS bridge).
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result).split(",")[1]);
+      r.onerror = reject;
+      r.readAsDataURL(blob);
+    });
+  }
+  async function androidSend(method, name, ext, exportQr) {
+    try {
+      const b64 = await blobToBase64(await exportQr.getRawData(ext));
+      const mime = ext === "svg" ? "image/svg+xml" : "image/png";
+      return window.AndroidQR[method](name + "." + ext, b64, mime);
+    } catch (e) { return "error:" + (e && e.message || e); }
+  }
+  if (window.AndroidQR) {
+    $("share").classList.remove("hidden");
+    $("share").addEventListener("click", async () => {
+      const name = (state.filename.trim() || "qr-code").replace(/[\\/:*?"<>|]+/g, "-");
+      const exportQr = new QRCodeStyling(options(state.size));
+      const res = await androidSend("share", name, "png", exportQr);
+      if (res.indexOf("error:") === 0) flash("Partage impossible : " + res.slice(6), false);
+    });
+  }
+
   $("dlPng").addEventListener("click", () => download("png"));
   $("dlSvg").addEventListener("click", () => download("svg"));
 

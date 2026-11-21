@@ -21,3 +21,17 @@ aller sur `https://<utilisateur>.github.io/Carnet-EDN/generateur-qrcode/`.
 
 Bibliothèque utilisée : [qr-code-styling](https://github.com/kozakdenys/qr-code-styling) (licence MIT),
 copiée dans `generateur-qrcode/vendor/` pour fonctionner hors ligne.
+
+### Application Android
+
+`generateur-qrcode/QR-Code-CV.apk` : la même application, installable sur Android 10 ou plus,
+qui fonctionne sans internet. Les PNG sont enregistrés dans la galerie (Images › QR codes),
+les SVG dans Téléchargements › QR codes, et un bouton « Partager » envoie le QR code par mail,
+WhatsApp, Drive…
+
+Installation : ouvrir le fichier .apk sur le téléphone et autoriser l'installation
+d'« applications de sources inconnues » quand Android le demande.
+
+Code source dans `generateur-qrcode/android/` (WebView native, sans dépendance). Construction :
+`ANDROID_HOME=… gradle assembleRelease` depuis ce dossier ; la page `index.html` est copiée
+automatiquement dans l'APK.
