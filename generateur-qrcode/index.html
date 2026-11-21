@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Générateur de QR code</title>
+<meta name="claude:viewport-fit-sides" content="cover">
 <meta name="description" content="Créez un QR code personnalisé (couleurs, formes, logo) vers votre portfolio, Google Drive ou site, à insérer dans un CV.">
 <style>
   :root {
@@ -32,7 +33,22 @@
       --warn-text: #f3cf86;
       --ok-bg: #163222;
       --ok-text: #8fdca6;
+      color-scheme: dark;
     }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14171b;
+    --panel: #1d2127;
+    --text: #e7eaee;
+    --muted: #9aa3ad;
+    --border: #333a43;
+    --accent: #6d97f0;
+    --accent-text: #0d1117;
+    --warn-bg: #3a2c10;
+    --warn-text: #f3cf86;
+    --ok-bg: #163222;
+    --ok-text: #8fdca6;
+    color-scheme: dark;
   }
   * { box-sizing: border-box; }
   body {
@@ -41,7 +57,11 @@
     color: var(--text);
     font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
-  header, main { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+  header, main {
+    max-width: 1040px; margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
   header { padding-top: 28px; padding-bottom: 8px; }
   h1 { font-size: 1.6rem; margin: 0 0 4px; }
   header p { margin: 0; color: var(--muted); }
@@ -480,9 +500,37 @@
     state.logo = null; $("logo").value = ""; syncInputs(); render();
   });
 
-  function download(ext) {
+  // On claude.ai the page cannot start a download itself: it goes through the
+  // "downloads" capability. Opened locally, the library downloads directly.
+  const downloadsReady = (window.claude && typeof window.claude.use === "function")
+    ? window.claude.use("downloads").catch(() => null)
+    : Promise.resolve(null);
+  const inClaude = !!(window.claude && typeof window.claude.use === "function");
+
+  function flash(text, ok) {
+    const st = $("status");
+    st.className = "status " + (ok ? "ok" : "warn");
+    st.textContent = text;
+  }
+
+  async function download(ext) {
     const name = (state.filename.trim() || "qr-code").replace(/[\\/:*?"<>|]+/g, "-");
     const exportQr = new QRCodeStyling(Object.assign(options(state.size), { type: ext === "svg" ? "svg" : "canvas" }));
+    const downloads = await downloadsReady;
+    if (downloads) {
+      try {
+        const blob = await exportQr.getRawData(ext);
+        await downloads.save({ filename: name + "." + ext, data: blob });
+        flash("Fichier " + name + "." + ext + " enregistré.", true);
+      } catch (e) {
+        const code = e && e.code;
+        if (code === "declined") flash("Téléchargement annulé.", false);
+        else if (code === "rate_limited") flash("Une fenêtre de téléchargement est déjà ouverte. Réessayez dans un instant.", false);
+        else flash("Le téléchargement n'est pas disponible ici. Ouvrez la page dans claude.ai ou depuis GitHub.", false);
+      }
+      return;
+    }
+    if (inClaude) { flash("Le téléchargement n'est pas disponible dans cet affichage. Ouvrez la page directement dans claude.ai.", false); return; }
     exportQr.download({ name, extension: ext });
   }
   $("dlPng").addEventListener("click", () => download("png"));
