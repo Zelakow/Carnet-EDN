@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Générateur de QR code</title>
+<meta name="description" content="Créez un QR code personnalisé (couleurs, formes, logo) vers votre portfolio, Google Drive ou site, à insérer dans un CV.">
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --panel: #ffffff;
+    --text: #1d232b;
+    --muted: #5d6773;
+    --border: #dde1e6;
+    --accent: #2c5cc5;
+    --accent-text: #ffffff;
+    --warn-bg: #fff4dc;
+    --warn-text: #7a4b00;
+    --ok-bg: #e6f5ea;
+    --ok-text: #1d6b33;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14171b;
+      --panel: #1d2127;
+      --text: #e7eaee;
+      --muted: #9aa3ad;
+      --border: #333a43;
+      --accent: #6d97f0;
+      --accent-text: #0d1117;
+      --warn-bg: #3a2c10;
+      --warn-text: #f3cf86;
+      --ok-bg: #163222;
+      --ok-text: #8fdca6;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  header, main { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+  header { padding-top: 28px; padding-bottom: 8px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  header p { margin: 0; color: var(--muted); }
+  main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 20px;
+    padding-top: 16px;
+    padding-bottom: 40px;
+    align-items: start;
+  }
+  @media (max-width: 820px) {
+    main { grid-template-columns: minmax(0, 1fr); }
+    .preview { order: -1; position: static !important; }
+  }
+  section {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin-bottom: 16px;
+  }
+  h2 { font-size: 1rem; margin: 0 0 12px; }
+  label { display: block; font-weight: 600; margin-bottom: 4px; font-size: .9rem; }
+  .hint { color: var(--muted); font-size: .85rem; margin: 4px 0 0; }
+  input[type="url"], input[type="text"], select {
+    width: 100%;
+    padding: 9px 11px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+  }
+  input[type="color"] {
+    width: 44px; height: 36px; padding: 2px;
+    border: 1px solid var(--border); border-radius: 8px; background: var(--bg);
+    cursor: pointer;
+  }
+  input[type="range"] { width: 100%; }
+  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
+  .field { margin-bottom: 14px; }
+  .field:last-child { margin-bottom: 0; }
+  .color-line { display: flex; align-items: center; gap: 8px; }
+  .color-line code { color: var(--muted); font-size: .85rem; }
+  .check { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+  .check input { margin: 0; }
+
+  .shapes { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+  .shape {
+    border: 1px solid var(--border); border-radius: 10px; background: var(--bg);
+    color: var(--text); padding: 8px 6px; cursor: pointer; font: inherit; font-size: .8rem;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+  }
+  .shape svg { width: 36px; height: 36px; }
+  .shape[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+
+  .presets { display: flex; flex-wrap: wrap; gap: 8px; }
+  .preset {
+    border: 1px solid var(--border); border-radius: 999px; background: var(--bg); color: var(--text);
+    padding: 5px 12px 5px 6px; cursor: pointer; font: inherit; font-size: .85rem;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .preset i { width: 18px; height: 18px; border-radius: 50%; display: inline-block; border: 1px solid var(--border); }
+
+  .preview { position: sticky; top: 16px; }
+  #qr {
+    display: flex; justify-content: center; align-items: center;
+    background: repeating-conic-gradient(#e9ecef 0 25%, #ffffff 0 50%) 0 0 / 16px 16px;
+    border-radius: 10px; padding: 12px; min-height: 260px;
+  }
+  #qr canvas, #qr svg { max-width: 100%; height: auto !important; }
+  .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  button.main {
+    border: 0; border-radius: 8px; padding: 10px; font: inherit; font-weight: 600; cursor: pointer;
+    background: var(--accent); color: var(--accent-text);
+  }
+  button.secondary {
+    border: 1px solid var(--border); border-radius: 8px; padding: 9px; font: inherit; cursor: pointer;
+    background: var(--bg); color: var(--text);
+  }
+  .status { border-radius: 8px; padding: 8px 10px; font-size: .85rem; margin-top: 12px; }
+  .status.warn { background: var(--warn-bg); color: var(--warn-text); }
+  .status.ok { background: var(--ok-bg); color: var(--ok-text); }
+  .hidden { display: none !important; }
+  details summary { cursor: pointer; font-weight: 600; }
+  details ol { padding-left: 20px; margin: 8px 0 0; }
+  details li { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Générateur de QR code</h1>
+  <p>Un QR code à votre image vers votre portfolio, Google Drive ou site — prêt à glisser dans votre CV.</p>
+</header>
+
+<main>
+  <div>
+    <section>
+      <h2>1. Le lien</h2>
+      <div class="field">
+        <label for="url">Adresse vers laquelle le QR code renvoie</label>
+        <input id="url" type="url" inputmode="url" placeholder="https://drive.google.com/…" value="https://drive.google.com/">
+        <p class="hint" id="url-hint">Collez le lien de partage de votre portfolio.</p>
+      </div>
+      <details>
+        <summary>Rendre un dossier Google Drive accessible</summary>
+        <ol>
+          <li>Clic droit sur le dossier ou fichier → <b>Partager</b>.</li>
+          <li>Dans « Accès général », choisissez <b>Tous les utilisateurs disposant du lien</b> (rôle : Lecteur).</li>
+          <li>Cliquez sur <b>Copier le lien</b> et collez-le ci-dessus.</li>
+          <li>Testez le QR code avec votre téléphone, en navigation privée, avant d'imprimer le CV.</li>
+        </ol>
+      </details>
+    </section>
+
+    <section>
+      <h2>2. Couleurs</h2>
+      <div class="field">
+        <label>Palettes rapides</label>
+        <div class="presets" id="presets"></div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="dotColor">Couleur des points</label>
+          <div class="color-line"><input id="dotColor" type="color" value="#1d232b"><code id="dotColorTxt"></code></div>
+        </div>
+        <div class="field">
+          <label for="cornerColor">Couleur des coins</label>
+          <div class="color-line"><input id="cornerColor" type="color" value="#1d232b"><code id="cornerColorTxt"></code></div>
+        </div>
+        <div class="field">
+          <label for="bgColor">Couleur du fond</label>
+          <div class="color-line"><input id="bgColor" type="color" value="#ffffff"><code id="bgColorTxt"></code></div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label class="check"><input id="useGradient" type="checkbox"> Dégradé sur les points</label>
+          <div class="color-line" id="gradientBox" style="margin-top:6px">
+            <input id="dotColor2" type="color" value="#2c5cc5" aria-label="Deuxième couleur du dégradé">
+            <select id="gradientType" aria-label="Type de dégradé" style="width:auto">
+              <option value="linear">Linéaire</option>
+              <option value="radial">Radial</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label class="check"><input id="transparent" type="checkbox"> Fond transparent</label>
+          <p class="hint">Pratique pour un CV avec un fond coloré (export PNG ou SVG).</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>3. Forme</h2>
+      <div class="field">
+        <label>Points</label>
+        <div class="shapes" id="dotShapes"></div>
+      </div>
+      <div class="field">
+        <label>Contour des coins</label>
+        <div class="shapes" id="cornerSquareShapes"></div>
+      </div>
+      <div class="field">
+        <label>Centre des coins</label>
+        <div class="shapes" id="cornerDotShapes"></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>4. Logo et réglages (facultatif)</h2>
+      <div class="field">
+        <label for="logo">Logo ou photo au centre</label>
+        <input id="logo" type="file" accept="image/*">
+        <p class="hint">Restez discret : un logo trop grand rend le code illisible.</p>
+        <button class="secondary hidden" id="removeLogo" type="button" style="margin-top:6px">Retirer le logo</button>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="logoSize">Taille du logo : <span id="logoSizeVal"></span></label>
+          <input id="logoSize" type="range" min="0.15" max="0.4" step="0.05" value="0.3">
+        </div>
+        <div class="field">
+          <label for="margin">Marge blanche : <span id="marginVal"></span></label>
+          <input id="margin" type="range" min="0" max="40" step="2" value="16">
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="size">Taille de l'export</label>
+          <select id="size">
+            <option value="512">512 px (écran)</option>
+            <option value="1024" selected>1024 px (impression CV)</option>
+            <option value="2048">2048 px (haute définition)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="ecc">Tolérance aux erreurs</label>
+          <select id="ecc">
+            <option value="L">Faible (7 %)</option>
+            <option value="M">Moyenne (15 %)</option>
+            <option value="Q" selected>Élevée (25 %)</option>
+            <option value="H">Maximale (30 %)</option>
+          </select>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <aside class="preview">
+    <section>
+      <h2>Aperçu</h2>
+      <div id="qr" aria-label="Aperçu du QR code"></div>
+      <div class="status hidden" id="status"></div>
+      <div class="field" style="margin-top:12px">
+        <label for="filename">Nom du fichier</label>
+        <input id="filename" type="text" value="qr-portfolio">
+      </div>
+      <div class="btns">
+        <button class="main" id="dlPng" type="button">Télécharger PNG</button>
+        <button class="main" id="dlSvg" type="button">Télécharger SVG</button>
+      </div>
+      <p class="hint">PNG : Word, Canva, Google Docs. SVG : net à toutes les tailles (Illustrator, Figma, Canva).<br>
+      Sur un CV imprimé, prévoyez au moins 2 × 2 cm.</p>
+      <button class="secondary" id="reset" type="button" style="width:100%;margin-top:8px">Réinitialiser</button>
+    </section>
+  </aside>
+</main>
+
+<script src="vendor/qr-code-styling.js"></script>
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const PREVIEW = 300;
+
+  const DOTS = [
+    ["square", "Carrés"], ["dots", "Ronds"], ["rounded", "Arrondis"],
+    ["extra-rounded", "Très arrondis"], ["classy", "Élégants"], ["classy-rounded", "Élégants arrondis"]
+  ];
+  const CORNER_SQ = [["square", "Carré"], ["extra-rounded", "Arrondi"], ["dot", "Rond"]];
+  const CORNER_DOT = [["square", "Carré"], ["dot", "Rond"]];
+
+  const PRESETS = [
+    { name: "Classique", dot: "#1d232b", corner: "#1d232b", bg: "#ffffff" },
+    { name: "Bleu pro", dot: "#1f3b73", corner: "#2c5cc5", bg: "#ffffff" },
+    { name: "Vert sauge", dot: "#2f5d50", corner: "#3f7f6a", bg: "#f4f8f5" },
+    { name: "Bordeaux", dot: "#6d1f33", corner: "#9b2c47", bg: "#ffffff" },
+    { name: "Violet", dot: "#4b2a85", corner: "#7a4fd1", bg: "#ffffff" },
+    { name: "Terracotta", dot: "#8a3b1e", corner: "#c2552b", bg: "#fffaf5" }
+  ];
+
+  // Small SVG pictograms for shape buttons
+  const ICON = {
+    dot: {
+      "square": '<rect x="4" y="4" width="12" height="12"/><rect x="20" y="4" width="12" height="12"/><rect x="4" y="20" width="12" height="12"/>',
+      "dots": '<circle cx="10" cy="10" r="6"/><circle cx="26" cy="10" r="6"/><circle cx="10" cy="26" r="6"/>',
+      "rounded": '<rect x="4" y="4" width="12" height="12" rx="4"/><rect x="20" y="4" width="12" height="12" rx="4"/><rect x="4" y="20" width="12" height="12" rx="4"/>',
+      "extra-rounded": '<rect x="4" y="4" width="12" height="12" rx="6"/><rect x="20" y="4" width="12" height="12" rx="6"/><rect x="4" y="20" width="12" height="12" rx="6"/>',
+      "classy": '<path d="M4 4h12v8a4 4 0 0 1-4 4H4z"/><path d="M20 4h12v12h-8a4 4 0 0 1-4-4z"/><path d="M4 20h8a4 4 0 0 1 4 4v8H4z"/>',
+      "classy-rounded": '<path d="M10 4h6v6a6 6 0 0 1-6 6 6 6 0 0 1-6-6 6 6 0 0 1 6-6z"/><path d="M20 4h6a6 6 0 0 1 6 6 6 6 0 0 1-6 6 6 6 0 0 1-6-6z"/><path d="M10 20a6 6 0 0 1 6 6v6h-6a6 6 0 0 1-6-6 6 6 0 0 1 6-6z"/>'
+    },
+    cornerSquare: {
+      "square": '<rect x="4" y="4" width="28" height="28" fill="none" stroke="currentColor" stroke-width="5"/>',
+      "extra-rounded": '<rect x="4" y="4" width="28" height="28" rx="9" fill="none" stroke="currentColor" stroke-width="5"/>',
+      "dot": '<circle cx="18" cy="18" r="14" fill="none" stroke="currentColor" stroke-width="5"/>'
+    },
+    cornerDot: {
+      "square": '<rect x="10" y="10" width="16" height="16"/>',
+      "dot": '<circle cx="18" cy="18" r="8"/>'
+    }
+  };
+
+  const DEFAULTS = {
+    url: "https://drive.google.com/",
+    dot: "#1d232b", corner: "#1d232b", bg: "#ffffff", dot2: "#2c5cc5",
+    gradient: false, gradientType: "linear", transparent: false,
+    dotType: "rounded", cornerSquareType: "extra-rounded", cornerDotType: "dot",
+    logo: null, logoSize: 0.3, margin: 16, size: 1024, ecc: "Q", filename: "qr-portfolio"
+  };
+  const state = Object.assign({}, DEFAULTS);
+
+  // ---------- shape pickers ----------
+  function buildShapes(containerId, list, icons, key) {
+    const box = $(containerId);
+    box.innerHTML = "";
+    list.forEach(([value, label]) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "shape";
+      b.dataset.value = value;
+      b.setAttribute("aria-pressed", String(state[key] === value));
+      b.innerHTML = '<svg viewBox="0 0 36 36" fill="currentColor" aria-hidden="true">' + icons[value] + "</svg>" + label;
+      b.addEventListener("click", () => {
+        state[key] = value;
+        box.querySelectorAll(".shape").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.value === value)));
+        render();
+      });
+      box.appendChild(b);
+    });
+  }
+
+  function buildPresets() {
+    const box = $("presets");
+    PRESETS.forEach((p) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "preset";
+      b.innerHTML = '<i style="background:linear-gradient(135deg,' + p.dot + " 50%," + p.corner + ' 50%)"></i>' + p.name;
+      b.addEventListener("click", () => {
+        state.dot = p.dot; state.corner = p.corner; state.bg = p.bg; state.gradient = false;
+        syncInputs(); render();
+      });
+      box.appendChild(b);
+    });
+  }
+
+  // ---------- contrast check (WCAG relative luminance) ----------
+  function lum(hex) {
+    const c = hex.replace("#", "");
+    const rgb = [0, 2, 4].map((i) => parseInt(c.substr(i, 2), 16) / 255)
+      .map((v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)));
+    return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+  }
+  function contrast(a, b) {
+    const [l1, l2] = [lum(a), lum(b)].sort((x, y) => y - x);
+    return (l1 + 0.05) / (l2 + 0.05);
+  }
+
+  function checks() {
+    const msgs = [];
+    const bg = state.transparent ? "#ffffff" : state.bg;
+    const fgs = [state.dot, state.corner].concat(state.gradient ? [state.dot2] : []);
+    const worst = Math.min.apply(null, fgs.map((f) => contrast(f, bg)));
+    if (worst < 3) msgs.push("Contraste trop faible : certains téléphones risquent de ne pas lire le code. Assombrissez les points ou éclaircissez le fond.");
+    if (!state.transparent && lum(state.bg) < Math.min.apply(null, fgs.map(lum))) msgs.push("Points plus clairs que le fond (couleurs inversées) : plusieurs lecteurs de QR code ne les reconnaissent pas.");
+    if (state.logo && state.ecc !== "H" && state.logoSize > 0.3) msgs.push("Logo grand : passez la tolérance aux erreurs sur « Maximale ».");
+    if (state.margin < 8) msgs.push("Marge très faible : gardez un peu d'espace autour du code pour qu'il soit bien détecté.");
+    if (state.transparent) msgs.push("Fond transparent : placez le code sur un fond clair dans votre CV.");
+    const url = state.url.trim();
+    if (!url) msgs.push("Ajoutez un lien.");
+    else if (!/^https?:\/\//i.test(url)) msgs.push("Le lien doit commencer par https:// pour s'ouvrir directement.");
+    const st = $("status");
+    st.classList.remove("hidden");
+    if (msgs.length) { st.className = "status warn"; st.textContent = msgs.join(" "); }
+    else { st.className = "status ok"; st.textContent = "Bon contraste. Pensez à scanner le code avec votre téléphone avant d'imprimer."; }
+
+    let hint = "Collez le lien de partage de votre portfolio.";
+    if (/drive\.google\.com|docs\.google\.com/i.test(url) && url.length > 30) hint = "Lien Google détecté : vérifiez que le partage est réglé sur « Tous les utilisateurs disposant du lien ».";
+    else if (url.length > 120) hint = "Lien long : le code sera plus dense. Il reste lisible, mais imprimez-le un peu plus grand.";
+    $("url-hint").textContent = hint;
+  }
+
+  // ---------- QR options ----------
+  function options(size) {
+    const dotsOptions = { type: state.dotType, color: state.dot };
+    if (state.gradient) {
+      dotsOptions.gradient = {
+        type: state.gradientType, rotation: Math.PI / 4,
+        colorStops: [{ offset: 0, color: state.dot }, { offset: 1, color: state.dot2 }]
+      };
+    }
+    const scale = size / PREVIEW;
+    return {
+      width: size, height: size, type: "canvas",
+      data: state.url.trim() || " ",
+      margin: Math.round(state.margin * scale),
+      qrOptions: { errorCorrectionLevel: state.ecc },
+      image: state.logo || undefined,
+      imageOptions: { hideBackgroundDots: true, imageSize: state.logoSize, margin: Math.round(4 * scale), crossOrigin: "anonymous" },
+      dotsOptions,
+      cornersSquareOptions: { type: state.cornerSquareType, color: state.corner },
+      cornersDotOptions: { type: state.cornerDotType, color: state.corner },
+      backgroundOptions: { color: state.transparent ? "transparent" : state.bg }
+    };
+  }
+
+  const qr = new QRCodeStyling(options(PREVIEW));
+  qr.append($("qr"));
+
+  let pending = null;
+  function render() {
+    clearTimeout(pending);
+    pending = setTimeout(() => { qr.update(options(PREVIEW)); checks(); }, 60);
+  }
+
+  function syncInputs() {
+    $("url").value = state.url;
+    $("dotColor").value = state.dot; $("cornerColor").value = state.corner; $("bgColor").value = state.bg;
+    $("dotColor2").value = state.dot2; $("gradientType").value = state.gradientType;
+    $("useGradient").checked = state.gradient; $("transparent").checked = state.transparent;
+    $("logoSize").value = state.logoSize; $("margin").value = state.margin;
+    $("size").value = String(state.size); $("ecc").value = state.ecc; $("filename").value = state.filename;
+    $("dotColorTxt").textContent = state.dot; $("cornerColorTxt").textContent = state.corner; $("bgColorTxt").textContent = state.bg;
+    $("logoSizeVal").textContent = Math.round(state.logoSize * 100) + " %";
+    $("marginVal").textContent = state.margin + " px";
+    $("gradientBox").style.opacity = state.gradient ? "1" : ".45";
+    $("bgColor").disabled = state.transparent;
+    $("removeLogo").classList.toggle("hidden", !state.logo);
+    ["dotShapes", "cornerSquareShapes", "cornerDotShapes"].forEach((id, i) => {
+      const key = ["dotType", "cornerSquareType", "cornerDotType"][i];
+      $(id).querySelectorAll(".shape").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.value === state[key])));
+    });
+  }
+
+  // ---------- events ----------
+  const bind = (id, key, ev, conv) => $(id).addEventListener(ev || "input", (e) => {
+    const t = e.target;
+    state[key] = conv ? conv(t) : t.value;
+    syncInputs(); render();
+  });
+  bind("url", "url");
+  bind("dotColor", "dot"); bind("cornerColor", "corner"); bind("bgColor", "bg"); bind("dotColor2", "dot2");
+  bind("gradientType", "gradientType", "change");
+  bind("useGradient", "gradient", "change", (t) => t.checked);
+  bind("transparent", "transparent", "change", (t) => t.checked);
+  bind("logoSize", "logoSize", "input", (t) => parseFloat(t.value));
+  bind("margin", "margin", "input", (t) => parseInt(t.value, 10));
+  bind("size", "size", "change", (t) => parseInt(t.value, 10));
+  bind("ecc", "ecc", "change");
+  bind("filename", "filename");
+
+  $("logo").addEventListener("change", (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      state.logo = r.result;
+      if (state.ecc !== "H") state.ecc = "H"; // a logo hides modules: use max redundancy
+      syncInputs(); render();
+    };
+    r.readAsDataURL(f);
+  });
+  $("removeLogo").addEventListener("click", () => {
+    state.logo = null; $("logo").value = ""; syncInputs(); render();
+  });
+
+  function download(ext) {
+    const name = (state.filename.trim() || "qr-code").replace(/[\\/:*?"<>|]+/g, "-");
+    const exportQr = new QRCodeStyling(Object.assign(options(state.size), { type: ext === "svg" ? "svg" : "canvas" }));
+    exportQr.download({ name, extension: ext });
+  }
+  $("dlPng").addEventListener("click", () => download("png"));
+  $("dlSvg").addEventListener("click", () => download("svg"));
+
+  $("reset").addEventListener("click", () => {
+    Object.assign(state, DEFAULTS); $("logo").value = ""; syncInputs(); render();
+  });
+
+  buildShapes("dotShapes", DOTS, ICON.dot, "dotType");
+  buildShapes("cornerSquareShapes", CORNER_SQ, ICON.cornerSquare, "cornerSquareType");
+  buildShapes("cornerDotShapes", CORNER_DOT, ICON.cornerDot, "cornerDotType");
+  buildPresets();
+  syncInputs();
+  render();
+})();
+</script>
+</body>
+</html>
